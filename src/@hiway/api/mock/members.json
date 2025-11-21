@@ -1,0 +1,14 @@
+[
+  {
+    "user_id": "admin",
+    "user_nm": "홍길동",
+    "dept_cd": "Q610",
+    "bsns_cd": "AQ00",
+    "company": "100",
+    "asgn_shrt_nm": "해양플랜트사업기획부",
+    "asgn_full_nm": "해양플랜트사업부-해양플랜트사업기획부",
+    "org_nm": "해양플랜트사업기획부",
+    "job_tit_nm": "과장",
+    "gubun": "인사정보"
+  }
+]

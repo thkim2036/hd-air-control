@@ -1,0 +1,129 @@
+/* ==========================================================================
+  TABULATOR CUSTOM THEME: Full Dark Grid
+  목적: 전체 다크 스타일 구성 (배경/글자/테두리 등)
+========================================================================== */
+
+/* ==========================================================================
+  [1] 테이블 전체 기본 설정
+========================================================================== */
+.tabulator {
+    background-color: #222242;
+    color: #f0f0f0;
+    font-size: 15px;
+    /*border-bottom: 1px solid #222242;*/
+}
+
+/* ==========================================================================
+  [2] 헤더 영역 (컬럼 헤더 + 병합 헤더 포함)
+========================================================================== */
+
+/* 일반 헤더 셀 */
+.tabulator .tabulator-header {
+    background-color: #222242;
+    border-bottom: 2px solid #ffffff;
+}
+
+.tabulator .tabulator-header .tabulator-header-contents .tabulator-headers .tabulator-col
+{
+    background-color: #222242;
+    color: #ffffff;
+    font-weight: bold;
+    font-size: medium;
+    border-bottom: 1px solid #ffffff;
+}
+
+/* title margin */
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+    margin-top: 10px; /* 원하는 만큼 조절 */
+}
+
+/* ==========================================================================
+  [3] 셀 (본문 셀 스타일)
+========================================================================== */
+.tabulator .tabulator-cell {
+    border-right: 1px solid #222242;   /* 셀 간 구분선 */
+}
+
+/* ==========================================================================
+  [4] 데이터 행 (본문)
+========================================================================== */
+.tabulator .tabulator-row {
+    /*border-bottom: 1px solid #000000;*/
+}
+
+/* ==========================================================================
+  [5] 그룹 행 (groupBy 옵션 사용 시)
+========================================================================== */
+
+.tabulator .tabulator-group {
+    background-color: #37385F;         /* 그룹 라벨 배경 */
+    color: #ffffff;                    /* 그룹 텍스트 */
+    font-weight: bold;
+    padding: 6px 12px;
+    border-top: 2px solid #222242;
+}
+
+.tabulator .tabulator-cell {
+    background-color: #454675;         /* 그룹 라벨 배경 */
+    color: #ffffff;                    /* 그룹 텍스트 */
+    font-weight: bold;
+    padding: 6px 12px;
+    border-top: 2px solid #222242;
+}
+
+/* ==========================================================================
+  [6] 푸터 및 페이징 영역
+========================================================================== */
+.tabulator .tabulator-footer {
+    background-color: #222242;
+    color: #cccccc;
+    border-top: 1px solid #ffffff;
+    padding: 6px;
+}
+
+/* (6-1) 페이지 이동 버튼 */
+.tabulator .tabulator-footer .tabulator-paginator button {
+    background-color: #2e2e2e;
+    color: #ffffff;
+    border: 1px solid #555;
+    margin: 2px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+/* (6-2) 활성 페이지 버튼 (active) */
+.tabulator .tabulator-footer .tabulator-paginator button.active {
+    background-color: #ffffff;
+    color: #000000;
+    font-weight: bold;
+}
+
+/* (6-3) 페이지 콤보박스 */
+.tabulator .tabulator-footer .tabulator-page-size {
+    text-align: center;
+    color: #555;
+}
+/* ==========================================================================
+  [7] 상호작용 효과 (hover, focus 등)
+========================================================================== */
+
+/* (7-1) 행 hover 시 강조 */
+.tabulator .tabulator-row:hover {
+    background-color: #A8A6DB;
+}
+
+/* (7-2) 셀 포커스 시 테두리 강조 */
+.tabulator .tabulator-cell:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px #666;
+}
+
+
+.tabulator-cell:hover {
+    background-color: #7F80A8;
+    color: #ffffff;
+}
+
+.tabulator .tabulator-col:hover {
+    background-color: #111 !important;
+}

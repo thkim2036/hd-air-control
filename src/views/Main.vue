@@ -1,0 +1,602 @@
+<template>
+  <div class="three-wrapper">
+    <canvas id="three-canvas"></canvas>
+
+    <!-- 압력기준 / 콤프실 / 공장 상태 / 날씨카드 -->
+    <div class="top-left-row">
+      <StandardTable />
+      <CompressorStatus />
+      <FactoryStatus />
+      <WeatherCard />
+    </div>
+
+    <!-- 딤드 배경 + 슬라이드 패널 -->
+    <div v-if="showPanel" class="overlay" @click.self="closePanel" >
+      <transition name="slide">
+        <div class="slide-panel" @click.stop>
+          <v-card flat class="panel-card">
+            <!-- 상단 제목 -->
+            <v-card-title class="panel-title d-flex justify-space-between align-center">
+              <div class="text-h6 d-flex align-center font-weight-bold">
+                <v-icon class="me-2">mdi-cursor-default-click-outline</v-icon>
+                컨트롤 밸브 제어
+              </div>
+              <v-btn icon @click="closePanel" size="small" variant="text">
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </v-card-title>
+
+            <v-divider />
+
+            <!-- 밸브 제어 -->
+            <v-card-text class="pt-5">
+              <v-card elevation="3" class="" style="background-color: #454675;">
+                <v-card-text>
+                  <ValveControlPanel :factory-id="selectedFactoryId" />
+                </v-card-text>
+              </v-card>
+            </v-card-text>
+
+          </v-card>
+        </div>
+      </transition>
+    </div>
+  </div>
+</template>
+
+<script>
+import { watch } from 'vue'
+import { useSSEStore } from '@/stores/sseStore'
+import { storeToRefs } from 'pinia'
+
+import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+
+import StandardTable from "@/components/StandardTable.vue";
+import CompressorStatus from '@/components/CompressorStatus.vue'
+import FactoryStatus from '@/components/FactoryStatus.vue'
+import ValveControlPanel from "@/components/ValveControlPanel.vue";
+import WeatherCard from "@/components/WeatherCard.vue";
+
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
+let drawerFlag = true;
+
+export default {
+  name: 'Main',
+  components: {
+    StandardTable,
+    CompressorStatus,
+    FactoryStatus,
+    WeatherCard,
+    ValveControlPanel,
+  },
+  props: {
+    drawerOpen: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  data() {
+    return {
+      renderer: null,
+      scene: null,
+      camera: null,
+      clickableObjects: [],
+      hoverableObjects: [],   // ✅ 오버 검사 대상만 관리
+
+      tooltipEl: null,
+      mouseEvent: null,
+      needsCheckHover: false,
+
+      showPanel: false,
+      selectedFactoryId: '',
+    }
+  },
+  watch: {
+    async drawerOpen(newVal) {
+      drawerFlag = newVal
+      try {
+        if (!newVal) {
+          await document.documentElement.requestFullscreen()
+        } else {
+          await document.exitFullscreen()
+        }
+      } catch (e) {
+        console.warn('fullscreen 전환 실패:', e)
+      }
+    }
+  },
+  mounted() {
+
+    this.init()
+
+    // ✅ 툴팁 div 생성
+    this.tooltipEl = document.createElement('div')
+    Object.assign(this.tooltipEl.style, {
+      position: 'absolute',
+      padding: '4px 8px',
+      background: 'rgba(0,0,0,0.7)',
+      color: '#fff',
+      fontSize: '12px',
+      borderRadius: '4px',
+      pointerEvents: 'none',
+      display: 'none',
+    })
+    document.body.appendChild(this.tooltipEl)
+
+    const canvas = this.renderer.domElement
+    canvas.addEventListener('mousemove', (e) => {
+      this.mouseEvent = e
+      this.needsCheckHover = true
+    })
+    canvas.addEventListener('click', this.handleClick)
+
+    // ✅ Hover 체크 루프 시작
+    this.checkHoverLoop()
+
+    // ⭐ fullscreenchange 발생할 때마다 통합 resize 실행
+    document.addEventListener('fullscreenchange', this.handleResize)
+    window.addEventListener('resize', this.handleResize)
+
+    // 압력 변화 감지 후 AirPipe 색상 변경
+    const { compPressure } = storeToRefs(useSSEStore())
+    watch(compPressure, (val) => {
+      const pressure1C = parseFloat(val['1C'] ?? '0')
+      const pressure3C = parseFloat(val['3C'] ?? '0')
+
+      if (pressure1C <= 7.5 || pressure3C <= 7.5) {
+        this.updateAirPipeColor('#0000ff')
+      } else {
+        this.updateAirPipeColor('#aaaaaa')
+      }
+    }, { deep: true })
+  },
+  beforeUnmount() {
+    const canvas = this.renderer?.domElement
+    if (canvas) {
+      canvas.removeEventListener('click', this.handleClick)
+    }
+    if (this.tooltipEl) {
+      document.body.removeChild(this.tooltipEl)
+    }
+  },
+  methods: {
+    // ✅ Hover 검사 루프 (requestAnimationFrame)
+    checkHoverLoop() {
+      requestAnimationFrame(this.checkHoverLoop)
+
+      if (!this.needsCheckHover || !this.mouseEvent) return
+      this.needsCheckHover = false
+
+      const event = this.mouseEvent
+      const canvas = this.renderer.domElement
+      const rect = canvas.getBoundingClientRect()
+
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+      raycaster.setFromCamera(mouse, this.camera)
+      const intersects = raycaster.intersectObjects(this.hoverableObjects, true)
+
+      if (intersects.length > 0) {
+        const hoveredMesh = intersects[0].object
+        const parentObject = this.hoverableObjects.find(
+            obj => obj === hoveredMesh || obj.getObjectById(hoveredMesh.id)
+        )
+
+        if (parentObject) {
+          canvas.style.cursor = 'pointer'
+          const text = parentObject.name.replace('-factory', '') + ' 공장'
+          if (this.tooltipEl.innerText !== text) {
+            this.tooltipEl.innerText = text
+          }
+          this.tooltipEl.style.left = event.clientX + 12 + 'px'
+          this.tooltipEl.style.top = event.clientY + 12 + 'px'
+          this.tooltipEl.style.display = 'block'
+          return
+        }
+      }
+
+      canvas.style.cursor = 'grab'
+      this.tooltipEl.style.display = 'none'
+    },
+    updateAirPipeColor(colorHex) {
+      const airPipeObj = this.clickableObjects.find(obj => obj.name === 'AirPipe')
+      if (!airPipeObj) return
+
+      airPipeObj.traverse(child => {
+        if (child.isMesh && child.material) {
+          const newMat = child.material.clone()
+          newMat.color.set(colorHex)
+          child.material = newMat
+        }
+      })
+    },
+    init() {
+
+      const canvas = document.querySelector('#three-canvas')
+      const renderer = new THREE.WebGLRenderer({canvas, antialias: true})
+      renderer.setSize(window.innerWidth * 0.9, window.innerHeight * 0.92)
+      renderer.setPixelRatio(window.devicePixelRatio > 1 ? 2 : 1)
+
+      const scene = new THREE.Scene()
+      scene.background = new THREE.Color('#FFFFFF')
+
+      // 배경 이미지
+      const loader = new THREE.TextureLoader()
+      loader.load('/images/blue-sky.jpg', texture => {
+        scene.background = texture
+      })
+
+      // 카메라
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+      camera.position.set(0, 25, 76)
+      camera.aspect = (window.innerWidth * 0.9) / window.innerHeight
+      scene.add(camera)
+
+      // 조명
+      scene.add(new THREE.AmbientLight('white', 1))
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1)
+      directionalLight.position.set(1, 0, 2)
+      scene.add(directionalLight)
+
+      // 모델링
+      const gltfLoader = new GLTFLoader()
+      gltfLoader.load('/models/HD-factory.glb', gltf => {
+        const root = gltf.scene
+        const names = ['etc-factory', '1B-factory', '2B-factory', 'AirPipe']
+
+        // label-* : 21개 담기
+        root.traverse(child => {
+          if (child.name.startsWith('label-')) {
+            names.push(child.name)
+          }
+        })
+
+        // 최종 리스트로 씬에 추가 및 클릭 가능 오브젝트 등록
+        names.forEach(name => {
+          const obj = root.getObjectByName(name)
+          if (!obj) return;
+
+          scene.add(obj)
+          if (name !== 'etc-factory') {
+            this.clickableObjects.push(obj)
+          }
+        })
+
+        // 라벨 카메라 기준 회전하기
+        this.labelObjects = this.clickableObjects.filter(o => o.name.startsWith('label-'))
+
+        // ✅ Hover 전용 배열
+        this.hoverableObjects = this.clickableObjects.filter(o =>
+            ['1B-factory','2B-factory'].includes(o.name)
+        )
+      })
+
+      // GridHelper 바닥
+      const grid = new THREE.GridHelper(1500, 150, '#222242', '#7F80A8')
+      grid.rotation.x = THREE.MathUtils.degToRad(-180);
+      grid.position.y = -1
+      scene.add(grid)
+
+      // 바닥 생성
+      const floor = new THREE.Mesh(
+          new THREE.PlaneGeometry(1500, 1500),
+          new THREE.MeshBasicMaterial({
+            map: this.createPeachyFloorTexture()
+          })
+      )
+      floor.rotation.x = -Math.PI / 2
+      floor.receiveShadow = true
+      floor.position.y = -1.1;
+      scene.add(floor)
+
+      // 마우스 컨트롤
+      const controls = new OrbitControls(camera, renderer.domElement)
+      controls.maxDistance = 82
+      controls.minDistance = 40
+      controls.minPolarAngle = THREE.MathUtils.degToRad(20)
+      controls.maxPolarAngle = THREE.MathUtils.degToRad(70)
+
+      controls.rotateSpeed = 0.1; // 마우스 회전 속도 조절
+      controls.autoRotate = false; // 회전 여부
+      controls.enableDamping = false;
+
+      // 1. 왕복 회전 값 정의
+      const minAz = THREE.MathUtils.degToRad(-20);
+      const maxAz = THREE.MathUtils.degToRad( 20);
+      const speed = 0.0005; // 조절: 클수록 빨라짐
+      let dir = 1; // 1: 시계, -1: 반시계
+
+      // 2. 자동 재시작 로직을 위한 플래그 & 타이머
+      let autoEnabled = true // 자동 왕복 실행 여부
+      let idleTimer   = null
+      const idleDelay = 10000 // 10초
+
+      // 3. 마우스 조작 시작 시 : 자동 왕복 중지
+      controls.addEventListener('start', () => {
+        autoEnabled = false
+        if (idleTimer) {
+          clearTimeout(idleTimer)
+          idleTimer = null
+        }
+      })
+
+      // 4. 마우스 조작 끝난 후 : 10초 후에 자동 왕복 재시작
+      controls.addEventListener('end', () => {
+        if (idleTimer) clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => {
+          autoEnabled = true
+        }, idleDelay)
+      })
+
+      // 애니메이션 루프 등록
+      renderer.setAnimationLoop((time) => {
+
+        controls.update();
+
+        // 바닥의 중심을 항상 카메라 바로 아래(XZ 평면)로 이동
+        // floor.position.x = camera.position.x;
+        // floor.position.z = camera.position.z;
+
+        // ✅ 라벨 항상 카메라 방향으로 회전
+        if (this.labelObjects) {
+          this.labelObjects.forEach(label => {
+            label.rotation.copy(this.camera.rotation)
+            label.rotateX(THREE.MathUtils.degToRad(105))
+            // label.rotateX(Math.PI / 1.7)
+          })
+        }
+
+        // 자동 좌우 회전 여부
+        if (autoEnabled) {
+          const offset = new THREE.Vector3().copy(camera.position).sub(controls.target); // 카메라⇆타겟 오프셋 벡터
+          const sph = new THREE.Spherical().setFromVector3(offset); // 구면좌표 변환
+          const nextTheta = THREE.MathUtils.clamp( sph.theta + speed * dir, minAz, maxAz ); // θ 업데이트 + 클램프
+
+          // 경계에 닿으면 방향 전환
+          if (nextTheta === maxAz || nextTheta === minAz) dir *= -1;
+          sph.theta = nextTheta;
+          offset.setFromSpherical(sph); // 다시 Cartesian 좌표로
+          camera.position.copy(controls.target).add(offset); // 카메라 위치 적용
+        }
+
+        renderer.render(scene, camera);
+      });
+
+      this.renderer = renderer
+      this.scene = scene
+      this.camera = camera
+
+      canvas.addEventListener('click', this.handleClick)
+    },
+    // 바닥 생성
+    createPeachyFloorTexture() {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1028
+      canvas.height = 1028
+      const ctx = canvas.getContext('2d')
+
+      // 부드러운 라디얼 그라디언트 (중심이 밝고 가장자리가 약간 어두운 톤)
+      const gradient = ctx.createRadialGradient(
+          canvas.width * 0.5, canvas.height * 0.5, 300,
+          canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.8
+      )
+      gradient.addColorStop(0, '#d0d0d0')   // 중심: 밝은 시멘트 느낌
+      gradient.addColorStop(0.5, '#a0a0a0') // 중간: 도시 회색 바닥
+      gradient.addColorStop(1, '#555555')   // 외곽: 어두운 아스팔트
+
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.wrapS = THREE.ClampToEdgeWrapping
+      texture.wrapT = THREE.ClampToEdgeWrapping
+      texture.minFilter = THREE.LinearFilter
+      texture.magFilter = THREE.LinearFilter
+
+      return texture
+    },
+    // 슬라이드: 1B, 2B 공장 컨트롤
+    handleClick(event) {
+      const canvas = this.renderer.domElement
+      const rect = canvas.getBoundingClientRect()
+
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+      raycaster.setFromCamera(mouse, this.camera)
+      const intersects = raycaster.intersectObjects(this.clickableObjects, true)
+
+      if (intersects.length === 0) return
+
+      const clickedMesh = intersects[0].object
+      const parentObject = this.clickableObjects.find(obj => obj === clickedMesh || obj.getObjectById(clickedMesh.id))
+
+      if (!parentObject) return
+
+      parentObject.traverse(child => {
+        if (child.isMesh && child.material) {
+          const newMat = child.material.clone()
+          if (parentObject.name === '1B-factory') {
+            newMat.color.set('#ff0000')
+            this.selectedFactoryId = '1B'
+            this.showPanel = true
+          }
+          else if (parentObject.name === '2B-factory') {
+            newMat.color.set('#ff0000')
+            this.selectedFactoryId = '2B'
+            this.showPanel = true
+          }
+          /*else if (parentObject.name === 'AirPipe') {
+            newMat.color.set('#0000ff')
+          }*/
+          child.material = newMat
+        }
+      })
+
+      if (['1B-factory', '2B-factory'].includes(parentObject.name)) {
+
+        this.selectedFactoryId = parentObject.name.replace('-factory', '')
+        this.showPanel = true
+      }
+
+      this.panelResize()
+
+    },
+    // 슬라이드 닫기
+    closePanel() {
+      this.showPanel = false
+      const targets = ['1B-factory', '2B-factory']
+      this.clickableObjects.forEach(obj => {
+        if (targets.includes(obj.name)) {
+          obj.traverse(child => {
+            if (child.isMesh && child.material) {
+              child.material.color.set('#ffffff')
+            }
+          })
+        }
+      })
+    },
+    // 전체화면
+    handleResize() {
+      const isFs = !!document.fullscreenElement
+      const vw = isFs ? screen.width : window.innerWidth
+      const vh = isFs ? screen.height : window.innerHeight
+
+      let width, height, overlayHeight, threeWrapper
+      if (drawerFlag) {
+        // drawer 열림: 일반화면
+        overlayHeight = "102%"
+        threeWrapper = "91vh"
+        width  = vw * 0.9
+        height = vh * 0.92
+      } else {
+        // drawer 닫힘: 전체화면
+        overlayHeight = "110%"
+        threeWrapper = "97vh"
+        width  = vw * 1.0
+        height = vh * 0.99
+      }
+      // console.log(`🖥 resize(통합) → ${drawerFlag ? '일반' : '전체'}화면`, width, height, threeWrapper, overlayHeight)
+
+      // three.js 카메라/렌더러 크기 조정
+      if (this.camera && this.renderer) {
+        this.camera.aspect = width / height
+        this.camera.updateProjectionMatrix()
+        this.renderer.setSize(width, height)
+      }
+
+      // wrapper / overlay 높이 동적 변경
+      const threeWrapperEl = document.querySelector(".three-wrapper")
+      const overlayEl = document.querySelector(".overlay")
+      if (threeWrapperEl) threeWrapperEl.style.height = threeWrapper
+      if (overlayEl) overlayEl.style.height = overlayHeight
+    },
+    panelResize() {
+      let threeWrapper, overlayHeight
+      if (drawerFlag) {
+        // drawer 열림: 일반화면
+        threeWrapper = "91vh"
+        overlayHeight = "102%"
+      } else {
+        // drawer 닫힘: 전체화면
+        threeWrapper = "97vh"
+        overlayHeight = "110%"
+      }
+      // console.log(`🖥 panelResize → ${drawerFlag ? '일반' : '전체'}화면`, threeWrapper, overlayHeight)
+
+      // ✅ 높이 동적으로 변경
+      const threeWrapperEl = document.querySelector(".three-wrapper")
+      const overlayEl = document.querySelector(".overlay")
+      if (threeWrapperEl || overlayEl) {
+        threeWrapperEl.style.height = threeWrapper
+        overlayEl.style.height = overlayHeight
+      }
+    }
+  },
+}
+</script>
+
+<style scoped>
+.three-wrapper {
+  position: relative;
+  width: 100%;
+  height: 90vh;
+}
+
+#three-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  cursor: -webkit-grab;
+}
+
+#three-canvas:active {
+  cursor: grabbing;
+  cursor: -webkit-grabbing;
+}
+.top-left-row {
+  position: absolute;
+  top: 16px;
+  left: 10px;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  z-index: 10;
+}
+
+/* ✅ 패널 등장 시 디버 배경 (v-main 위에 고정) */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 102%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.slide-panel {
+  width: 360px;
+  height: 100%;
+  background-color: #222242;
+  color: white;
+  padding: 0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.4);
+  z-index: 21;
+}
+
+.panel-card {
+  height: 100%;
+  background-color: #37385F;
+  color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-title {
+  font-size: 18px;
+  font-weight: bold;
+  background-color: #222242;
+  color: white;
+  padding: 16px;
+}
+
+.custom-table td {
+  border-bottom: 1px solid #ccc;
+  padding: 5px 5px !important;
+  vertical-align: middle;
+}
+
+.custom-table tr:last-child td {
+  border-bottom: none;
+}
+
+</style>
+

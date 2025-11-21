@@ -1,0 +1,14 @@
+{
+  "uidev": {
+    "user_id": "uidev",
+    "eng_nm": "Developer",
+    "kor_nm": "개발자",
+    "roles": ["development"]
+  },
+  "admin": {
+    "user_id": "admin",
+    "eng_nm": "Admin",
+    "kor_nm": "관리자",
+    "roles": ["admin", "development"]
+  }
+}

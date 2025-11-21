@@ -1,0 +1,24 @@
+[
+  {
+    "app_id": "HIWAY4VUETIFY",
+    "user_id": "admin",
+    "mymenu_id": "MYMN00001",
+    "menu_id": "MN00001",
+    "mymenu_nme": "서브테스트1",
+    "prnts_path": "테스트1>서브테스트1",
+    "path": "/test1/subTest",
+    "icon_path": "mdi-clipboard-text-search-outline",
+    "mnu_seq": 0
+  },
+  {
+    "app_id": "HIWAY4VUETIFY",
+    "user_id": "admin",
+    "mymenu_id": "MYMN00004",
+    "menu_id": "MN00004",
+    "mymenu_nme": "레벨3테스트",
+    "prnts_path": "테스트1>서브테스트2>레벨3테스트",
+    "path": "/test1/subTest2/child",
+    "icon_path": "mdi-chart-line",
+    "mnu_seq": 1
+  }
+]

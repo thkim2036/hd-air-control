@@ -1,0 +1,6 @@
+[
+  {
+    "menu_id": "MN00001",
+    "actions": ["btnSearch", "btnCreate"]
+  }
+]

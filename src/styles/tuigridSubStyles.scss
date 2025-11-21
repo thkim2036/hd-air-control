@@ -1,0 +1,151 @@
+// 렌더러 기본 설정
+.tui-button {
+  border-radius: 2px;
+  font-size: 12px;
+  margin-inline-end: 5px;
+  padding-block: 0;
+  padding-inline: 5px;
+}
+
+.tui-span {
+  overflow: hidden;
+  padding-inline-start: 10px;
+  text-overflow: ellipsis;
+}
+
+.tui-grid-row-selected {
+  color: rgb(var(--v-theme-primary)) !important;
+  font-weight: bold;
+}
+
+.v-theme--dark {
+  // 그리드
+  td.tui-grid-cell-require {
+    background-color: #ecebb9 !important;
+    color: #312d4b !important;
+  }
+
+  td.tui-grid-cell-edited {
+    background-color: #9ab897 !important;
+    color: #312d4b !important;
+  }
+
+  td.tui-grid-cell-created {
+    background-color: #bed0db !important;
+    color: #312d4b !important;
+  }
+
+  .tui-grid-layer-state {
+    background-color: #312d4b !important;
+  }
+
+  // 렌더러
+  .tui-button {
+    border: 1px solid #5c577c;
+    background: #312d4b;
+    color: #e7e3fcad;
+  }
+
+  .tui-span {
+    color: #e7e3fcad;
+  }
+
+  .tui-grid-cell-edited .tui-span {
+    color: #312d4b;
+  }
+
+  .tui-grid-cell-created .tui-span {
+    color: #312d4b;
+  }
+
+  td.tui-grid-row-selected {
+    background-color: #474360 !important;
+  }
+
+  .tui-grid-cell-content input[type="text"] {
+    color: #312d4b;
+  }
+}
+
+.v-theme--light {
+  // 렌더러
+  .tui-button {
+    border: 1px solid #5e5669de;
+    background: #fff;
+    color: #5e5669de;
+  }
+
+  .tui-span {
+    color: #5e5669de;
+  }
+
+  // 그리드
+  td.tui-grid-cell-require {
+    background-color: #fffccf !important;
+  }
+
+  td.tui-grid-cell-edited {
+    background-color: #c6f0c2 !important;
+  }
+
+  td.tui-grid-cell-created {
+    background-color: #d3f1ff !important;
+  }
+
+  td.tui-grid-row-selected {
+    background-color: #f5f0fa !important;
+  }
+}
+
+.tui-grid-container {
+  font-family: "Spoqa Han Sans Neo", sans-serif !important;
+}
+
+.tui-grid-table {
+  border: 1px transparent !important;
+}
+
+ul.tui-select-box-dropdown {
+  padding-inline-start: 0 !important;
+}
+
+// z-index 설정
+.tui-grid-border-line {
+  z-index: 0 !important;
+}
+
+.tui-grid-lside-area {
+  z-index: 0 !important;
+}
+
+.tui-grid-layer-state {
+  z-index: 0 !important;
+}
+
+.tui-grid-scrollbar-right-top {
+  z-index: 0 !important;
+}
+
+.tui-grid-scrollbar-left-bottom {
+  z-index: 0 !important;
+}
+
+.tui-grid-scrollbar-right-bottom {
+  z-index: 0 !important;
+}
+
+.tui-grid-scrollbar-y-inner-border {
+  z-index: 0 !important;
+}
+
+.tui-grid-scrollbar-y-outer-border {
+  z-index: 0 !important;
+}
+
+.tui-grid-scrollbar-frozen-border {
+  z-index: 0 !important;
+}
+
+.tui-grid-layer-focus-border {
+  z-index: 0 !important;
+}

@@ -1,0 +1,27 @@
+@font-face {
+  font-family: 'HD';
+  src: url('../assets/font/HD-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD';
+  src: url('../assets/font/HD-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD';
+  src: url('../assets/font/HD-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: 'HD', 'Noto Sans KR', 'Roboto', sans-serif;
+}

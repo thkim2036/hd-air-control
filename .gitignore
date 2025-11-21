@@ -1,0 +1,9 @@
+# 패키지
+node_modules/
+
+# 빌드 출력
+dist/
+build/
+
+# 로그
+*.log
