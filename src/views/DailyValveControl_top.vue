@@ -302,8 +302,15 @@ function initTable() {
     // -------------------------------------------------------
     rowFormatter: function (row) {
       const rowData = row.getData();
-      const allRows = row.getTable().getRows();
-      const currentIndex = allRows.indexOf(row);
+      const prevRow = row.getPrevRow();
+
+      // 첫 행이면 이전 행 없음 → 병합 불가
+      if (!prevRow) return;
+
+      const prevData = prevRow.getData();
+
+      // 공장(blaCell)이 다르면 병합 금지
+      if (rowData.blaCell !== prevData.blaCell) return;
 
       // 병합 대상 필드들
       const mergeFields = [
@@ -314,47 +321,16 @@ function initTable() {
 
       mergeFields.forEach((field) => {
         const cell = row.getCell(field);
-        if (!cell) return;
+        const prevCell = prevRow.getCell(field);
 
-        const cellEl = cell.getElement();
+        if (!cell || !prevCell) return;
 
-        // 이전 행과 비교
-        const prevRow = row.getPrevRow();
-        const prevData = prevRow ? prevRow.getData() : null;
-
-        // 공장이 다르거나, 값이 다르면 병합 대상 아님
-        if (prevData &&
-            rowData.blaCell === prevData.blaCell &&
-            rowData[field] === prevData[field]) {
-          // 중간 행: 숨김 처리
-          cellEl.style.color = "transparent";
-          cellEl.style.borderTop = "none";
-          return;
-        }
-
-        // 병합 시작 행: 몇 개 행이 병합되는지 계산
-        let mergeCount = 1;
-        for (let i = currentIndex + 1; i < allRows.length; i++) {
-          const nextRow = allRows[i];
-          const nextData = nextRow.getData();
-
-          // 공장이 다르거나 값이 다르면 병합 종료
-          if (nextData.blaCell !== rowData.blaCell ||
-              nextData[field] !== rowData[field]) {
-            break;
-          }
-          mergeCount++;
-        }
-
-        // 병합된 행이 2개 이상이면 세로 중앙 정렬
-        if (mergeCount > 1) {
-          cellEl.style.display = "flex";
-          cellEl.style.alignItems = "center";
-          cellEl.style.justifyContent = "center";
-          // 높이를 병합된 행 수만큼 설정 (각 행 높이를 계산)
-          const rowHeight = row.getElement().offsetHeight;
-          cellEl.style.height = (rowHeight * mergeCount) + "px";
-          cellEl.style.position = "relative";
+        // 같은 값일 때만 병합처럼 보이기
+        if (rowData[field] === prevData[field]) {
+          const el = cell.getElement();
+          el.style.color = "transparent"; // 텍스트 숨김
+          el.style.borderTop = "none"; // 위쪽 border 제거(시각적으로 병합처럼 보이게)
+          el.classList.add("merged-center"); // ⭐ 병합 중앙정렬 class 추가
         }
       });
     },
@@ -973,6 +949,9 @@ function loadMockData() {
 ::v-deep(.tabulator .tabulator-header .tabulator-col) {
   pointer-events: none !important;
 }
+
+/* 병합된 셀 중앙 정렬 + darkgreen 테마 충돌 방지 */
+
 
 /* v-date-picker-controls 내부 첫 번째 button만 숨기기 */
 ::v-deep(.v-date-picker-controls > button:first-of-type) {
