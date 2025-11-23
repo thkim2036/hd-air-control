@@ -283,6 +283,8 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const dialogContent = ref([])
 
+
+
 // ● Tabulator 세팅
 function initTable() {
   table = new Tabulator(gridContainer.value, {
@@ -302,59 +304,78 @@ function initTable() {
     // -------------------------------------------------------
     rowFormatter: function (row) {
       const rowData = row.getData();
-      const allRows = row.getTable().getRows();
-      const currentIndex = allRows.indexOf(row);
+      const prevRow = row.getPrevRow();
+      const groupRows = row.getGroup().getRows();
 
-      // 병합 대상 필드들
-      const mergeFields = [
-        "blaCell", "shipNoList", "blockList", "workList",
-        "driveMode", "valveStatus", "frontPressure", "backPressure", "temperature",
-        "stTime", "edTime", "workDateStSchedule", "workDateEdSchedule"
+      const deviceFields = [
+        "driveMode",
+        "valveStatus",
+        "frontPressure",
+        "backPressure",
+        "temperature"
       ];
 
-      mergeFields.forEach((field) => {
+      const scheduleFields = [
+        "stTime",
+        "edTime",
+        "workDateStSchedule",
+        "workDateEdSchedule"
+      ];
+
+      const mergeFields = [
+        "blaCell",
+        "shipNoList",
+        "blockList",
+        ...deviceFields,
+        ...scheduleFields
+      ];
+
+      mergeFields.forEach(field => {
         const cell = row.getCell(field);
         if (!cell) return;
 
-        const cellEl = cell.getElement();
+        const el = cell.getElement();
 
-        // 이전 행과 비교
-        const prevRow = row.getPrevRow();
-        const prevData = prevRow ? prevRow.getData() : null;
+        // ----------------------------
+        // 1. 병합 그룹 가져오기
+        // ----------------------------
+        const sameRows = getMergeGroup(field, row, groupRows);
+        const index = sameRows.indexOf(row);
+        const total = sameRows.length;
+        const centerIndex = Math.floor(total / 2);
 
-        // 공장이 다르거나, 값이 다르면 병합 대상 아님
-        if (prevData &&
-            rowData.blaCell === prevData.blaCell &&
-            rowData[field] === prevData[field]) {
-          // 중간 행: 숨김 처리
-          cellEl.style.color = "transparent";
-          cellEl.style.borderTop = "none";
-          return;
-        }
+        // ----------------------------
+        // 2. 이전 row 와 값이 다르면 borderTop 표시
+        // ----------------------------
+        if (prevRow) {
+          const prevData = prevRow.getData();
 
-        // 병합 시작 행: 몇 개 행이 병합되는지 계산
-        let mergeCount = 1;
-        for (let i = currentIndex + 1; i < allRows.length; i++) {
-          const nextRow = allRows[i];
-          const nextData = nextRow.getData();
-
-          // 공장이 다르거나 값이 다르면 병합 종료
-          if (nextData.blaCell !== rowData.blaCell ||
-              nextData[field] !== rowData[field]) {
-            break;
+          // ⭐ 장비상태 & 일정은 공장이 아니라 blockList 기준으로 borderTop 판단
+          if (deviceFields.includes(field) || scheduleFields.includes(field)) {
+            if (rowData.blockList !== prevData.blockList) {
+              el.style.borderTop = "";          // border 표시
+              el.style.color = "transparent";   // 첫 row 텍스트 숨김
+              return;
+            }
           }
-          mergeCount++;
+
+          // ⭐ 나머지 필드는 원래대로 field 단위 비교
+          if (rowData[field] !== prevData[field]) {
+            el.style.borderTop = "";            // border 표시
+            el.style.color = "transparent";     // 텍스트 숨김
+            return;
+          }
         }
 
-        // 병합된 행이 2개 이상이면 세로 중앙 정렬
-        if (mergeCount > 1) {
-          cellEl.style.display = "flex";
-          cellEl.style.alignItems = "center";
-          cellEl.style.justifyContent = "center";
-          // 높이를 병합된 행 수만큼 설정 (각 행 높이를 계산)
-          const rowHeight = row.getElement().offsetHeight;
-          cellEl.style.height = (rowHeight * mergeCount) + "px";
-          cellEl.style.position = "relative";
+        // ----------------------------
+        // 3. 가운데 행 표시
+        // ----------------------------
+        if (index === centerIndex) {
+          el.style.color = "";
+          el.style.borderTop = "none";
+        } else {
+          el.style.color = "transparent";
+          el.style.borderTop = "none";
         }
       });
     },
@@ -370,14 +391,6 @@ function initTable() {
       {
         title: '호선',
         field: 'shipNoList',
-        // formatter: function(cell){
-        //   let val = cell.getValue();
-        //   if(!val) return "";
-        //   // return val.split(",").join("<br>");
-        //   const arr = val.split(",")
-        //   return arr.length > 4 ? arr.slice(0, 4).join("<br>") + "<br>..." : arr.join("<br>")
-        // },
-        // cellClick: (e, cell) => showRowDetail(cell.getRow().getData()), // 🧩 공통 함수 호출
         hozAlign: 'center',
         vertAlign: 'middle',
         titleFormatter: () => `<div style="margin-top: 30px; font-size: 18px;">호선</div>`,
@@ -385,14 +398,6 @@ function initTable() {
       {
         title: '블록',
         field: 'blockList',
-        // formatter: function(cell){
-        //   let val = cell.getValue();
-        //   if(!val) return "";
-        //   // return val.split(",").join("<br>");
-        //   const arr = val.split(",")
-        //   return arr.length > 4 ? arr.slice(0, 4).join("<br>") + "<br>..." : arr.join("<br>")
-        // },
-        // cellClick: (e, cell) => showRowDetail(cell.getRow().getData()), // 🧩 공통 함수 호출
         hozAlign: 'center',
         vertAlign: 'middle',
         titleFormatter: () => `<div style="margin-top: 30px; font-size: 18px;">블록</div>`,
@@ -400,14 +405,6 @@ function initTable() {
       {
         title: '작업내용',
         field: 'workList',
-        // formatter: function(cell){
-        //   let val = cell.getValue();
-        //   if(!val) return "";
-        //   // return val.split(",").join("<br>");
-        //   const arr = val.split(",")
-        //   return arr.length > 4 ? arr.slice(0, 4).join("<br>") + "<br>..." : arr.join("<br>")
-        // },
-        // cellClick: (e, cell) => showRowDetail(cell.getRow().getData()), // 🧩 공통 함수 호출
         hozAlign: 'center',
         vertAlign: 'middle',
         titleFormatter: () => `<div style="margin-top: 30px; font-size: 18px;">작업내용</div>`,
@@ -463,6 +460,45 @@ function initTable() {
     ],
   })
 }
+
+// 병합 기준
+function getMergeGroup(field, row, groupRows) {
+  const rowData = row.getData();
+
+  switch(field) {
+    case "blaCell":             // 공장 병합
+      return groupRows.filter(r => r.getData().blaCell === rowData.blaCell);
+
+    case "shipNoList":          // 호선 병합
+      return groupRows.filter(r => r.getData().shipNoList === rowData.shipNoList);
+
+    case "blockList":           // 블록 병합
+      return groupRows.filter(r => r.getData().blockList === rowData.blockList);
+
+      // 장비상태는 블록 기준 병합
+    case "driveMode":
+    case "valveStatus":
+    case "frontPressure":
+    case "backPressure":
+    case "temperature":
+      return groupRows.filter(r => r.getData().blockList === rowData.blockList);
+
+      // 스케줄도 블록 기준 병합
+    case "stTime":
+    case "edTime":
+    case "workDateStSchedule":
+    case "workDateEdSchedule":
+      return groupRows.filter(r => r.getData().blockList === rowData.blockList);
+
+      // 작업내용은 병합 없음 → 자기 자신만 포함
+    case "workList":
+      return [row];
+
+    default:
+      return [row];
+  }
+}
+
 
 // ● 데이터 조회 함수
 async function loadData() {
@@ -696,10 +732,10 @@ function loadMockData() {
       shipNoList: '840506',
       blockList: '1B15',
       workList: 'B/L',
-      stTime: '09:00',
-      edTime: '18:00',
-      workDateStSchedule: '08:30',
-      workDateEdSchedule: '18:30',
+      stTime: '19:00',
+      edTime: '22:00',
+      workDateStSchedule: '18:30',
+      workDateEdSchedule: '22:30',
       driveMode: driveMode.value['1B'] ?? '-',
       valveStatus: valveStatus.value['1B'] ?? '-',
       frontPressure: frontPressure.value['1B'] ?? '-',
@@ -712,10 +748,10 @@ function loadMockData() {
       shipNoList: '840506',
       blockList: '1B15',
       workList: '수거',
-      stTime: '09:00',
-      edTime: '18:00',
-      workDateStSchedule: '08:30',
-      workDateEdSchedule: '18:30',
+      stTime: '19:00',
+      edTime: '22:00',
+      workDateStSchedule: '18:30',
+      workDateEdSchedule: '22:30',
       driveMode: driveMode.value['1B'] ?? '-',
       valveStatus: valveStatus.value['1B'] ?? '-',
       frontPressure: frontPressure.value['1B'] ?? '-',
@@ -728,10 +764,10 @@ function loadMockData() {
       shipNoList: '840506',
       blockList: '1B15',
       workList: '수거1',
-      stTime: '09:00',
-      edTime: '18:00',
-      workDateStSchedule: '08:30',
-      workDateEdSchedule: '18:30',
+      stTime: '19:00',
+      edTime: '22:00',
+      workDateStSchedule: '18:30',
+      workDateEdSchedule: '22:30',
       driveMode: driveMode.value['1B'] ?? '-',
       valveStatus: valveStatus.value['1B'] ?? '-',
       frontPressure: frontPressure.value['1B'] ?? '-',
@@ -973,6 +1009,9 @@ function loadMockData() {
 ::v-deep(.tabulator .tabulator-header .tabulator-col) {
   pointer-events: none !important;
 }
+
+/* 병합된 셀 중앙 정렬 + darkgreen 테마 충돌 방지 */
+
 
 /* v-date-picker-controls 내부 첫 번째 button만 숨기기 */
 ::v-deep(.v-date-picker-controls > button:first-of-type) {
